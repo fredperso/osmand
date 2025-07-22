@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSMAND Tracker - Suivi en Temps Réel</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #header {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+            position: relative;
+        }
+
+        #header h1 {
+            font-size: 1.5em;
+            font-weight: 300;
+        }
+
+        #status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e74c3c;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #27ae60;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        #tracker-count {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        #map {
+            height: calc(100vh - 60px);
+            width: 100%;
+        }
+
+        #sidebar {
+            position: absolute;
+            top: 60px;
+            right: 0;
+            width: 300px;
+            height: calc(100vh - 60px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid #ddd;
+            overflow-y: auto;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        #sidebar.open {
+            transform: translateX(0);
+        }
+
+        #sidebar-toggle {
+            position: absolute;
+            top: 70px;
+            right: 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1001;
+            font-size: 14px;
+        }
+
+        .tracker-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .tracker-item:hover {
+            background: #f8f9fa;
+        }
+
+        .tracker-name {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .tracker-info {
+            font-size: 0.85em;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .tracker-time {
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        .popup-content {
+            min-width: 200px;
+        }
+
+        .popup-header {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .popup-info {
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .popup-info strong {
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>🗺️ OSMAND Tracker</h1>
+        <div id="status">
+            <div class="status-indicator" id="connection-status"></div>
+            <span id="connection-text">Déconnecté</span>
+            <div id="tracker-count">0 trackers</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+    
+    <button id="sidebar-toggle">📋 Liste</button>
+    <div id="sidebar">
+        <div style="padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd;">
+            <strong>Trackers Actifs</strong>
+        </div>
+        <div id="tracker-list"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        class TrackerApp {
+            constructor() {
+                this.map = null;
+                this.socket = null;
+                this.trackers = new Map();
+                this.markers = new Map();
+                this.init();
+            }
+
+            init() {
+                this.initMap();
+                this.initSocket();
+                this.initUI();
+            }
+
+            initMap() {
+                // Initialisation de la carte centrée sur la France
+                this.map = L.map('map').setView([46.603354, 1.888334], 6);
+
+                // Ajout des tuiles OpenStreetMap
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 18
+                }).addTo(this.map);
+            }
+
+            initSocket() {
+                this.socket = io();
+
+                this.socket.on('connect', () => {
+                    this.updateConnectionStatus(true);
+                });
+
+                this.socket.on('disconnect', () => {
+                    this.updateConnectionStatus(false);
+                });
+
+                this.socket.on('allTrackers', (trackers) => {
+                    trackers.forEach(tracker => this.updateTracker(tracker));
+                });
+
+                this.socket.on('trackerUpdate', (tracker) => {
+                    this.updateTracker(tracker);
+                });
+
+                this.socket.on('trackerRemoved', (trackerId) => {
+                    this.removeTracker(trackerId);
+                });
+            }
+
+            initUI() {
+                const sidebarToggle = document.getElementById('sidebar-toggle');
+                const sidebar = document.getElementById('sidebar');
+
+                sidebarToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('open');
+                });
+
+                // Fermer sidebar en cliquant sur la carte
+                this.map.on('click', () => {
+                    sidebar.classList.remove('open');
+                });
+            }
+
+            updateConnectionStatus(connected) {
+                const indicator = document.getElementById('connection-status');
+                const text = document.getElementById('connection-text');
+
+                if (connected) {
+                    indicator.classList.add('connected');
+                    text.textContent = 'Connecté';
+                } else {
+                    indicator.classList.remove('connected');
+                    text.textContent = 'Déconnecté';
+                }
+            }
+
+            updateTracker(tracker) {
+                this.trackers.set(tracker.id, tracker);
+
+                // Mise à jour ou création du marqueur
+                let marker = this.markers.get(tracker.id);
+                const position = [tracker.latitude, tracker.longitude];
+
+                if (!marker) {
+                    // Création d'un nouveau marqueur
+                    marker = L.marker(position, {
+                        title: tracker.devicename
+                    }).addTo(this.map);
+                    
+                    this.markers.set(tracker.id, marker);
+                } else {
+                    // Mise à jour de la position
+                    marker.setLatLng(position);
+                }
+
+                // Mise à jour du popup
+                const popupContent = this.createPopupContent(tracker);
+                marker.bindPopup(popupContent);
+
+                // Mise à jour de la liste
+                this.updateTrackerList();
+
+                // Auto-zoom sur le premier tracker
+                if (this.trackers.size === 1) {
+                    this.map.setView(position, 13);
+                }
+            }
+
+            createPopupContent(tracker) {
+                const lastUpdate = new Date(tracker.timestamp).toLocaleString('fr-FR');
+                const speed = tracker.speed ? `${Math.round(tracker.speed * 3.6)} km/h` : 'N/A';
+                const altitude = tracker.altitude ? `${Math.round(tracker.altitude)}m` : 'N/A';
+                const accuracy = tracker.accuracy ? `${Math.round(tracker.accuracy)}m` : 'N/A';
+                const battery = tracker.battery ? `${tracker.battery}%` : 'N/A';
+
+                return `
+                    <div class="popup-content">
+                        <div class="popup-header">${tracker.devicename}</div>
+                        <div class="popup-info">
+                            <strong>ID:</strong> ${tracker.id}<br>
+                            <strong>Position:</strong> ${tracker.latitude.toFixed(6)}, ${tracker.longitude.toFixed(6)}<br>
+                            <strong>Vitesse:</strong> ${speed}<br>
+                            <strong>Altitude:</strong> ${altitude}<br>
+                            <strong>Précision:</strong> ${accuracy}<br>
+                            <strong>Batterie:</strong> ${battery}<br>
+                            <strong>Dernière MAJ:</strong> ${lastUpdate}
+                        </div>
+                    </div>
+                `;
+            }
+
+            removeTracker(trackerId) {
+                // Suppression du marqueur
+                const marker = this.markers.get(trackerId);
+                if (marker) {
+                    this.map.removeLayer(marker);
+                    this.markers.delete(trackerId);
+                }
+
+                // Suppression des données
+                this.trackers.delete(trackerId);
+
+                // Mise à jour de la liste
+                this.updateTrackerList();
+            }
+
+            updateTrackerList() {
+                const trackerList = document.getElementById('tracker-list');
+                const trackerCount = document.getElementById('tracker-count');
+                
+                trackerCount.textContent = `${this.trackers.size} tracker${this.trackers.size > 1 ? 's' : ''}`;
+
+                trackerList.innerHTML = '';
+
+                if (this.trackers.size === 0) {
+                    trackerList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">Aucun tracker actif</div>';
+                    return;
+                }
+
+                this.trackers.forEach((tracker) => {
+                    const item = document.createElement('div');
+                    item.className = 'tracker-item';
+                    
+                    const lastUpdate = new Date(tracker.timestamp).toLocaleString('fr-FR');
+                    const speed = tracker.speed ? `${Math.round(tracker.speed * 3.6)} km/h` : 'N/A';
+                    
+                    item.innerHTML = `
+                        <div class="tracker-name">${tracker.devicename}</div>
+                        <div class="tracker-info">
+                            ID: ${tracker.id}<br>
+                            Vitesse: ${speed}<br>
+                            <span class="tracker-time">${lastUpdate}</span>
+                        </div>
+                    `;
+
+                    item.addEventListener('click', () => {
+                        const marker = this.markers.get(tracker.id);
+                        if (marker) {
+                            this.map.setView(marker.getLatLng(), 15);
+                            marker.openPopup();
+                        }
+                        document.getElementById('sidebar').classList.remove('open');
+                    });
+
+                    trackerList.appendChild(item);
+                });
+            }
+        }
+
+        // Démarrage de l'application
+        document.addEventListener('DOMContentLoaded', () => {
+            new TrackerApp();
+        });
+    </script>
+</body>
+</html>

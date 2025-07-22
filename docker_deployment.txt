@@ -1,0 +1,110 @@
+# Dockerfile
+FROM node:18-alpine
+
+# Création du répertoire de travail
+WORKDIR /app
+
+# Copie des fichiers de dépendances
+COPY package*.json ./
+
+# Installation des dépendances
+RUN npm ci --only=production
+
+# Copie du code source
+COPY . .
+
+# Création du répertoire public pour les assets statiques
+RUN mkdir -p public
+
+# Exposition du port
+EXPOSE 3000
+
+# Variables d'environnement par défaut
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Démarrage de l'application
+CMD ["npm", "start"]
+
+---
+
+# docker-compose.yml
+version: '3.8'
+
+services:
+  osmand-tracker:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - tracker-network
+
+  # Optionnel: Nginx comme reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - osmand-tracker
+    restart: unless-stopped
+    networks:
+      - tracker-network
+
+networks:
+  tracker-network:
+    driver: bridge
+
+---
+
+# nginx.conf (optionnel)
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream tracker_backend {
+        server osmand-tracker:3000;
+    }
+
+    server {
+        listen 80;
+        server_name votre-domaine.com;
+        
+        # Redirection HTTPS (optionnel)
+        # return 301 https://$server_name$request_uri;
+        
+        location / {
+            proxy_pass http://tracker_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # Support WebSocket pour Socket.IO
+        location /socket.io/ {
+            proxy_pass http://tracker_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}

@@ -100,6 +100,20 @@
         .tracker-item:hover {
             background: #f8f9fa;
         }
+        .history-btn {
+            margin-top: 8px;
+            padding: 5px 12px;
+            background: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .history-btn:hover {
+            background: #217dbb;
+        }
         .tracker-name {
             font-weight: bold;
             color: #2c3e50;
@@ -255,6 +269,15 @@
                             Batterie: ${tracker.battery || 0}%<br>
                             <span class="tracker-time">${tracker.lastUpdate}</span>
                         </div>`;
+                    // Add "View 72H History" button
+                    const historyBtn = document.createElement('button');
+                    historyBtn.textContent = 'Voir historique 72H';
+                    historyBtn.className = 'history-btn';
+                    historyBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.showTrackerHistory(tracker.id);
+                    };
+                    item.appendChild(historyBtn);
                     item.onclick = () => {
                         if (this.markers[tracker.id]) {
                             this.map.setView([tracker.latitude, tracker.longitude], 16);
@@ -263,6 +286,27 @@
                     };
                     list.appendChild(item);
                 });
+            }
+
+            async showTrackerHistory(trackerId) {
+                // Remove previous history polyline if any
+                if (this.historyPolyline) {
+                    this.map.removeLayer(this.historyPolyline);
+                    this.historyPolyline = null;
+                }
+                try {
+                    const resp = await fetch(`/api/trackers/${trackerId}/positions72h`);
+                    const positions = await resp.json();
+                    if (!Array.isArray(positions) || positions.length === 0) {
+                        alert('Aucune donnée historique trouvée pour ce tracker.');
+                        return;
+                    }
+                    const latlngs = positions.map(p => [p.latitude, p.longitude]);
+                    this.historyPolyline = L.polyline(latlngs, { color: '#0074D9', weight: 5, opacity: 0.7 }).addTo(this.map);
+                    this.map.fitBounds(this.historyPolyline.getBounds());
+                } catch (err) {
+                    alert('Erreur lors du chargement de l\'historique.');
+                }
             }
         }
         document.addEventListener('DOMContentLoaded', () => {

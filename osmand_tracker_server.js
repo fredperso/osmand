@@ -331,6 +331,24 @@ app.get('/api/trackers/:id/positions24h', async (req, res) => {
     }
 });
 
+// API pour récupérer les positions d'un tracker sur les dernières 72h
+app.get('/api/trackers/:id/positions72h', async (req, res) => {
+    const trackerId = req.params.id;
+    try {
+        const result = await pgPool.query(
+            `SELECT tracker_id, devicename, latitude, longitude, timestamp, speed, bearing, altitude, accuracy, battery
+             FROM tracker_positions
+             WHERE tracker_id = $1 AND timestamp > NOW() - INTERVAL '72 HOURS'
+             ORDER BY timestamp ASC`,
+            [trackerId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('PG select error (positions72h):', err);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // Gestion des connexions WebSocket
 io.on('connection', (socket) => {
     console.log('Client connecté:', socket.id);

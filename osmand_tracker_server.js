@@ -121,3 +121,27 @@ async function startServer() {
 }
 
 startServer();
+
+// --- Graceful Shutdown ---
+function gracefulShutdown(signal) {
+    console.log(`\n${signal} received: closing HTTP server, WebSocket, and database pool...`);
+    server.close(() => {
+        console.log('HTTP server closed.');
+        // Close active WebSocket connections
+        io.close(() => console.log('WebSocket server closed.'));
+        // Close PostgreSQL pool
+        pgPool.end(() => {
+            console.log('PostgreSQL pool terminated.');
+            process.exit(0);
+        });
+    });
+    // Force exit if shutdown takes too long (e.g. 10s)
+    setTimeout(() => {
+        console.error('Forcing shutdown after timeout.');
+        process.exit(1);
+    }, 10000).unref();
+}
+
+['SIGINT', 'SIGTERM'].forEach(signal => {
+    process.on(signal, () => gracefulShutdown(signal));
+});

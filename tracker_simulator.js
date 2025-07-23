@@ -4,12 +4,12 @@
 const axios = require('axios');
 
 const TRACKER_ID = '12345';
-const URL = 'https://osmand.onrender.com/osmand';
+const URL = 'http://localhost:3000/osmand';
 const CENTER_LAT = 48.8566; // Paris center latitude
 const CENTER_LON = 2.3522;  // Paris center longitude
 const RADIUS_METERS = 1000; // 1km radius for the circular path
 const SPEED_KMH = 10;       // 10 km/h
-const INTERVAL_MS = 1000;   // 1 second updates
+const INTERVAL_MS = 10000;   // 1 second updates
 
 // Earth radius in meters
 const EARTH_RADIUS = 6371000;
@@ -43,11 +43,25 @@ async function sendPosition(device, lat, lon, speed, bearing) {
             bearing,
             altitude: 35,
             accuracy: 5,
-            batt: device.battery,
             devicename: device.devicename
         };
+
+        if (typeof device.battery !== 'undefined') {
+            params.batt = device.battery;
+        }
+        if (typeof device.charge !== 'undefined') {
+            params.charge = device.charge;
+        }
+
         const response = await axios.post(URL, params);
-        console.log(`[${new Date().toLocaleTimeString()}] [${device.devicename}] Sent (POST): lat=${lat.toFixed(5)}, lon=${lon.toFixed(5)}, bearing=${bearing}, speed=${speed}km/h, batt=${device.battery.toFixed(2)} | Server:`, response.data);
+        let logMessage = `[${new Date().toLocaleTimeString()}] [${device.devicename}] Sent (POST): lat=${lat.toFixed(5)}, lon=${lon.toFixed(5)}, bearing=${bearing}, speed=${speed}km/h`;
+        if (typeof device.battery !== 'undefined') {
+            logMessage += `, batt=${device.battery.toFixed(2)}`;
+        }
+        if (typeof device.charge !== 'undefined') {
+            logMessage += `, charge=${device.charge}`;
+        }
+        console.log(`${logMessage} | Server:`, response.data);
     } catch (error) {
         if (error.response) {
             // The request was made and the server responded with a status code out of 2xx
@@ -77,8 +91,17 @@ function simulateMovement() {
             const { lat, lon } = computePosition(CENTER_LAT, CENTER_LON, RADIUS_METERS, device.angle);
             // Bearing is tangent to the circle
             const bearing = (toDegrees(device.angle) + 90) % 360;
+
+            // Simulate battery charge/discharge
+            if (typeof device.battery !== 'undefined') {
+                if (device.charge) {
+                    device.battery = Math.min(100, device.battery + 0.05); // Charge slowly
+                } else {
+                    device.battery = Math.max(0, device.battery - 0.01); // Discharge slowly
+                }
+            }
+
             sendPosition(device, lat, lon, SPEED_KMH, bearing);
-            device.battery = Math.max(0, device.battery - 0.01); // Simulate slow battery drain
         });
     }, INTERVAL_MS);
 }
@@ -89,13 +112,21 @@ const DEVICES = [
         id: '12345',
         devicename: 'Simulated Paris Device 1',
         angle: 0, // Start at 0 radians
-        battery: 95
+        battery: 95,
+        charge: false
     },
     {
         id: '67890',
         devicename: 'Simulated Paris Device 2',
         angle: Math.PI, // Start opposite side of circle
-        battery: 90
+        battery: 20, // Low battery
+        charge: true // Charging
+    },
+    {
+        id: 'ABCDE',
+        devicename: 'Simulated Paris Device 3',
+        angle: Math.PI / 2, // Start at 90 degrees
+        // This device sends no battery or charge info
     }
 ];
 

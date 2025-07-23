@@ -242,9 +242,14 @@
                         <div><strong>Bearing:</strong> ${tracker.bearing || 0}°</div>
                         <div><strong>Altitude:</strong> ${tracker.altitude || 0} m</div>
                         <div><strong>Batterie:</strong> ${tracker.battery || 0}%</div>
-                        <div><strong>Dernière maj:</strong> ${tracker.lastUpdate}</div>
+                        <div><strong>Dernière maj:</strong> ${this.formatLocalDate(tracker.lastUpdate || tracker.timestamp)}</div>
                     </div>
                 </div>`;
+            }
+            formatLocalDate(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return date.toLocaleString();
             }
             removeTracker(trackerId) {
                 delete this.trackers[trackerId];
@@ -267,7 +272,7 @@
                             Lat: ${tracker.latitude}, Lon: ${tracker.longitude}<br>
                             Vitesse: ${tracker.speed || 0} km/h<br>
                             Batterie: ${tracker.battery || 0}%<br>
-                            <span class="tracker-time">${tracker.lastUpdate}</span>
+                            <span class="tracker-time">${this.formatLocalDate(tracker.lastUpdate || tracker.timestamp)}</span>
                         </div>`;
                     // Add "View 72H History" button
                     const historyBtn = document.createElement('button');

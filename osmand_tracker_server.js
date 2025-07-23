@@ -190,6 +190,11 @@ app.get('/osmand', (req, res) => {
                         trackerData.battery
                     ]
                 );
+                // Cleanup: delete positions older than 72H for this tracker
+                await pgPool.query(
+                    `DELETE FROM tracker_positions WHERE tracker_id = $1 AND timestamp < NOW() - INTERVAL '72 HOURS'`,
+                    [trackerData.id]
+                );
             } catch (dbErr) {
                 console.error('PG insert error (GET /osmand):', dbErr);
             }
@@ -266,6 +271,11 @@ app.post('/osmand', (req, res) => {
                         trackerData.accuracy,
                         trackerData.batt // Note: 'batt' used for POST
                     ]
+                );
+                // Cleanup: delete positions older than 72H for this tracker
+                await pgPool.query(
+                    `DELETE FROM tracker_positions WHERE tracker_id = $1 AND timestamp < NOW() - INTERVAL '72 HOURS'`,
+                    [trackerData.id]
                 );
             } catch (dbErr) {
                 console.error('PG insert error (POST /osmand):', dbErr);

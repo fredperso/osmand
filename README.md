@@ -10,6 +10,8 @@ This project is a real-time GPS tracking server designed to work with the OsmAnd
 - **PostgreSQL Storage:** Persists tracker location history in a PostgreSQL database.
 - **Secure Authentication:** User authentication is handled through a database with hashed passwords.
 - **Environment-based Configuration:** Securely manages database credentials and other settings using environment variables, ready for deployment on services like Render.com.
+- **Built-in Simulator:** Easily generate fake tracker data for local testing with `tracker_simulator.js`.
+- **Docker Support:** Ready-to-use `Dockerfile` and `docker-compose.yml` for containerised deployments.
 
 ## Tech Stack
 
@@ -44,7 +46,14 @@ npm install
 Create a `.env` file in the root of the project. This file will hold your database connection string.
 
 ```
+# PostgreSQL connection string
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+
+# Session secret used to sign cookies
+SESSION_SECRET="change-me-in-production"
+
+# Port (optional – defaults to 3000)
+PORT=3000
 ```
 
 Replace the placeholder with your actual PostgreSQL connection URL.
@@ -96,7 +105,13 @@ Follow the prompts to set a username and password. The script will output an `IN
 
 ## Running the Application
 
-Start the server with the following command:
+Start the server in development:
+
+```bash
+npm start
+```
+
+(The **start** script simply runs `node osmand_tracker_server.js`.)
 
 ```bash
 node osmand_tracker_server.js

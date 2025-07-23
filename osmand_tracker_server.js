@@ -18,6 +18,9 @@ const io = socketIo(server);
 // In-memory storage for current tracker positions
 const trackers = new Map();
 
+// Trust the Render proxy so secure cookies work behind TLS termination
+app.set('trust proxy', 1);
+
 // Session middleware setup
 app.use(session({
     secret: process.env.SESSION_SECRET || 'osmand-tracker-secret',

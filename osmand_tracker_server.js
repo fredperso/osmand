@@ -232,6 +232,7 @@ app.post('/osmand', (req, res) => {
             altitude,
             accuracy,
             batt,
+            charge,
             devicename
         } = req.body;
 
@@ -251,6 +252,7 @@ app.post('/osmand', (req, res) => {
             altitude: altitude ? parseFloat(altitude) : null,
             accuracy: accuracy ? parseFloat(accuracy) : null,
             batt: batt ? parseFloat(batt) : null,
+            charge: typeof charge !== 'undefined' ? (charge === true || charge === 'true' || charge === '1') : null,
             lastUpdate: new Date().toISOString()
         };
 

@@ -7,13 +7,14 @@ const path = require('path');
 
 const fs = require('fs');
 const session = require('express-session');
+const bcrypt = require('bcrypt');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
 // Load authentication config
-const authConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'auth_config.json')));
+
 
 // Session middleware
 app.use(session({
@@ -101,20 +102,23 @@ app.get('/', requireAuth, (req, res) => {
 });
 
 // Login endpoint
-app.post('/login', express.urlencoded({ extended: true }), (req, res) => {
+app.post('/login', express.urlencoded({ extended: true }), async (req, res) => {
     const { login, password } = req.body;
-    if (login === authConfig.login && password === authConfig.password) {
-        req.session.authenticated = true;
-        res.redirect('/');
-    } else {
-        // Render login page with error message injected
-        const fs = require('fs');
-        const path = require('path');
-        const loginHtmlPath = path.join(__dirname, 'public', 'login.html');
-        let html = fs.readFileSync(loginHtmlPath, 'utf8');
-        // Insert error message after <form ...>
-        html = html.replace('<div id="error" class="error" style="display:none;"></div>', '<div id="error" class="error">Identifiant ou mot de passe incorrect</div>');
-        res.status(200).send(html);
+    try {
+        const result = await pgPool.query('SELECT * FROM users WHERE username = $1', [login]);
+        if (result.rows.length > 0) {
+            const user = result.rows[0];
+            const match = await bcrypt.compare(password, user.password_hash);
+            if (match) {
+                req.session.authenticated = true;
+                return res.redirect('/');
+            }
+        }
+        // If user not found or password doesn't match, redirect with error
+        res.redirect('/login.html?error=1');
+    } catch (err) {
+        console.error('Login error:', err);
+        res.redirect('/login.html?error=1');
     }
 });
 

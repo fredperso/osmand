@@ -262,8 +262,8 @@ app.post('/osmand', (req, res) => {
         (async () => {
             try {
                 await pgPool.query(
-                    `INSERT INTO tracker_positions (tracker_id, devicename, latitude, longitude, timestamp, speed, bearing, altitude, accuracy, battery)
-                    VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0), $6, $7, $8, $9, $10)`,
+                    `INSERT INTO tracker_positions (tracker_id, devicename, latitude, longitude, timestamp, speed, bearing, altitude, accuracy, battery, charge)
+                    VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0), $6, $7, $8, $9, $10, $11)`,
                     [
                         trackerData.id,
                         trackerData.devicename,

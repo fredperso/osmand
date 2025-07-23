@@ -4,7 +4,7 @@
 const axios = require('axios');
 
 const TRACKER_ID = '12345';
-const URL = 'http://localhost:3000/osmand';
+const URL = 'https://osmand.onrender.com/osmand';
 const CENTER_LAT = 48.8566; // Paris center latitude
 const CENTER_LON = 2.3522;  // Paris center longitude
 const RADIUS_METERS = 1000; // 1km radius for the circular path
@@ -47,13 +47,20 @@ async function sendPosition(device, lat, lon, speed, bearing) {
             devicename: device.devicename
         };
         const response = await axios.post(URL, params);
-        console.log(`[${new Date().toLocaleTimeString()}] [${device.devicename}] Sent (POST): lat=${lat.toFixed(5)}, lon=${lon.toFixed(5)}, bearing=${bearing}, speed=${speed}km/h, battery=${device.battery.toFixed(2)} | Server:`, response.data);
+        console.log(`[${new Date().toLocaleTimeString()}] [${device.devicename}] Sent (POST): lat=${lat.toFixed(5)}, lon=${lon.toFixed(5)}, bearing=${bearing}, speed=${speed}km/h, batt=${device.battery.toFixed(2)} | Server:`, response.data);
     } catch (error) {
         if (error.response) {
+            // The request was made and the server responded with a status code out of 2xx
             console.error(`[${device.devicename}] Error response:`, error.response.status, error.response.data);
+        } else if (error.request) {
+            // The request was made but no response received
+            console.error(`[${device.devicename}] No response received:`, error.request);
         } else {
+            // Something happened in setting up the request
             console.error(`[${device.devicename}] Error:`, error.message);
         }
+        // Print the full error for debugging
+        console.error(error);
     }
 }
 

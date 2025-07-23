@@ -1,4 +1,5 @@
 // server.js
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -49,14 +50,6 @@ const trackers = new Map();
 // PostgreSQL integration
 const { Pool } = require('pg');
 let PG_CONNECTION_STRING = process.env.RENDER_POSTGRES_URL || process.env.DATABASE_URL || undefined;
-try {
-    const pgConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'pg_config.json')));
-    if (pgConfig.pg_url) {
-        PG_CONNECTION_STRING = pgConfig.pg_url;
-    }
-} catch (e) {
-    // Fallback to env var if config file not found
-}
 const pgPool = new Pool({
     connectionString: PG_CONNECTION_STRING,
     ssl: PG_CONNECTION_STRING ? { rejectUnauthorized: false } : false

@@ -145,7 +145,8 @@ app.get('/osmand', (req, res) => {
             bearing,
             altitude,
             accuracy,
-            battery,
+            batt,
+            charge,
             devicename
         } = req.query;
 
@@ -164,7 +165,8 @@ app.get('/osmand', (req, res) => {
             bearing: bearing ? parseFloat(bearing) : null,
             altitude: altitude ? parseFloat(altitude) : null,
             accuracy: accuracy ? parseFloat(accuracy) : null,
-            battery: battery ? parseFloat(battery) : null,
+            battery: batt ? parseFloat(batt) : null,
+            charge: typeof charge !== 'undefined' ? (charge === 'true' || charge === '1') : null,
             lastUpdate: new Date().toISOString()
         };
 
@@ -187,7 +189,8 @@ app.get('/osmand', (req, res) => {
                         trackerData.bearing,
                         trackerData.altitude,
                         trackerData.accuracy,
-                        trackerData.battery
+                        trackerData.battery,
+                        trackerData.charge
                     ]
                 );
                 // Cleanup: delete positions older than 72H for this tracker
@@ -269,7 +272,8 @@ app.post('/osmand', (req, res) => {
                         trackerData.bearing,
                         trackerData.altitude,
                         trackerData.accuracy,
-                        trackerData.batt // Note: 'batt' used for POST
+                        trackerData.batt, // Note: 'batt' used for POST
+                        trackerData.charge
                     ]
                 );
                 // Cleanup: delete positions older than 72H for this tracker

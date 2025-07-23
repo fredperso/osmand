@@ -9,6 +9,7 @@ CREATE TABLE tracker_positions (
     bearing DOUBLE PRECISION,
     altitude DOUBLE PRECISION,
     accuracy DOUBLE PRECISION,
-    battery DOUBLE PRECISION
+    battery DOUBLE PRECISION,
+    charge BOOLEAN
 );
 CREATE INDEX idx_tracker_time ON tracker_positions (tracker_id, timestamp);

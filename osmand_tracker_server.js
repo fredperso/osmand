@@ -274,6 +274,16 @@ app.get('/api/trackers/:id', (req, res) => {
     }
 });
 
+// DB health check endpoint
+app.get('/db-health', async (req, res) => {
+    try {
+        const result = await pgPool.query('SELECT NOW()');
+        res.json({ status: 'ok', time: result.rows[0].now });
+    } catch (err) {
+        res.status(500).json({ status: 'error', error: err.message });
+    }
+});
+
 // API pour récupérer les positions d'un tracker sur les dernières 24h
 app.get('/api/trackers/:id/positions24h', async (req, res) => {
     const trackerId = req.params.id;

@@ -62,6 +62,35 @@ const pgPool = new Pool({
     ssl: PG_CONNECTION_STRING ? { rejectUnauthorized: false } : false
 });
 
+// Ensure tracker_positions table exists
+async function ensureTrackerPositionsTable() {
+    const createTableSQL = `
+    CREATE TABLE IF NOT EXISTS tracker_positions (
+        id SERIAL PRIMARY KEY,
+        tracker_id VARCHAR NOT NULL,
+        devicename VARCHAR,
+        latitude DOUBLE PRECISION NOT NULL,
+        longitude DOUBLE PRECISION NOT NULL,
+        timestamp TIMESTAMP NOT NULL,
+        speed DOUBLE PRECISION,
+        bearing DOUBLE PRECISION,
+        altitude DOUBLE PRECISION,
+        accuracy DOUBLE PRECISION,
+        battery DOUBLE PRECISION
+    );
+    CREATE INDEX IF NOT EXISTS idx_tracker_time ON tracker_positions (tracker_id, timestamp);
+    `;
+    try {
+        await pgPool.query(createTableSQL);
+        console.log("tracker_positions table ensured.");
+    } catch (err) {
+        console.error("Error ensuring tracker_positions table:", err);
+    }
+}
+
+// Call table ensure on startup
+ensureTrackerPositionsTable();
+
 // Configuration du port
 const PORT = process.env.PORT || 3000;
 

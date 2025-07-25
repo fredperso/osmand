@@ -8,7 +8,7 @@ const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 
 // Import local modules
-const { pgPool, ensureTrackerPositionsTable } = require('./database');
+const { pgPool, ensureTrackerPositionsTable, ensureSessionTable } = require('./database');
 const createPublicRoutes = require('./routes/public');
 const createApiRoutes = require('./routes/api');
 

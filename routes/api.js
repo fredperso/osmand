@@ -127,6 +127,30 @@ function createApiRoutes(io, trackers) {
         }
     });
 
+    // Get closest tracker position to a timestamp
+    router.get('/trackers/:trackerId/closest', async (req, res) => {
+        const { trackerId } = req.params;
+        const { timestamp } = req.query;
+        if (!timestamp) {
+            return res.status(400).json({ error: 'Missing timestamp parameter' });
+        }
+        try {
+            const result = await pgPool.query(
+                `SELECT * FROM tracker_positions
+                 WHERE tracker_id = $1
+                 ORDER BY ABS(EXTRACT(EPOCH FROM (timestamp - $2::timestamp))) ASC
+                 LIMIT 1`,
+                [trackerId, timestamp]
+            );
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'No position found' });
+            }
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error('Error fetching closest tracker position:', err);
+            res.status(500).json({ error: 'Database error', details: err.message });
+        }
+    });
     return router;
 }
 

@@ -114,25 +114,58 @@ class TrackerApp {
 
         // Main timelapse slider handler
         slider.addEventListener('input', async (e) => {
-            const val = slider.value;
-            timeLabel.textContent = sliderValueToLabel(val);
-            infoDiv.textContent = '';
-            const trackerId = this.getTimelapseTrackerId();
-            if (!trackerId) {
-                infoDiv.textContent = 'Aucun tracker actif.';
-                return;
+    const val = slider.value;
+    timeLabel.textContent = sliderValueToLabel(val);
+    infoDiv.textContent = '';
+    const trackerId = this.getTimelapseTrackerId();
+    if (!trackerId) {
+        infoDiv.textContent = 'Aucun tracker actif.';
+        return;
+    }
+    this.timelapseActive = true;
+    // Remove previous orange marker for this tracker if any
+    if (!this.timelapseMarkers) this.timelapseMarkers = {};
+    if (this.timelapseMarkers[trackerId]) {
+        this.map.removeLayer(this.timelapseMarkers[trackerId]);
+        delete this.timelapseMarkers[trackerId];
+    }
+    if (parseInt(val, 10) !== 0) {
+        // Fetch the closest position for this tracker at the selected time
+        try {
+            const resp = await fetch(`/api/trackers/${trackerId}/closest?timestamp=${encodeURIComponent(sliderValueToTimestamp(val))}`);
+            if (resp.ok) {
+                const position = await resp.json();
+                if (position && position.latitude && position.longitude) {
+                    const marker = L.marker([position.latitude, position.longitude], {
+                        icon: L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png',
+                            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        })
+                    }).addTo(this.map);
+                    marker.bindPopup(this.createPopupContent(position, true));
+                    this.timelapseMarkers[trackerId] = marker;
+                }
             }
-            this.timelapseActive = true;
-            await this.showTimelapse(trackerId, sliderValueToTimestamp(val));
-            // Ensure sidebar stays visible during timelapse
-            document.getElementById('sidebar').classList.add('open');
-            this.sidebarOpen = true;
-        });
+        } catch (err) {
+            console.error('Erreur lors de la récupération de la position timelapse:', err);
+        }
+    }
+//     await this.showTimelapse(trackerId, sliderValueToTimestamp(val));
+    // Ensure sidebar stays visible during timelapse
+    document.getElementById('sidebar').classList.add('open');
+    this.sidebarOpen = true;
+});
         // Reset timelapse if user interacts with live map
         document.getElementById('map').addEventListener('click', () => {
-            if (this.timelapseMarker) {
-                this.map.removeLayer(this.timelapseMarker);
-                this.timelapseMarker = null;
+            if (this.timelapseMarkers) {
+                for (const marker of Object.values(this.timelapseMarkers)) {
+                    this.map.removeLayer(marker);
+                }
+                this.timelapseMarkers = {};
             }
             this.timelapseActive = false;
         });
@@ -243,58 +276,108 @@ class TrackerApp {
         const trackerArray = Object.values(this.trackers);
         document.getElementById('tracker-count').textContent = `${trackerArray.length} tracker${trackerArray.length !== 1 ? 's' : ''}`;
         trackerArray.forEach(tracker => {
-            const item = document.createElement('div');
-            item.className = 'tracker-item' + (tracker.inactive ? ' tracker-inactive' : '');
-            const lat = parseFloat(tracker.latitude).toFixed(4);
-            const lon = parseFloat(tracker.longitude).toFixed(4);
+    const item = document.createElement('div');
+    item.className = 'tracker-item' + (tracker.inactive ? ' tracker-inactive' : '');
+    const lat = parseFloat(tracker.latitude).toFixed(4);
+    const lon = parseFloat(tracker.longitude).toFixed(4);
 
-            item.innerHTML = `
-                <div class="tracker-name">${tracker.devicename || tracker.id}</div>
-                <div class="tracker-info">
-                    <div class="tracker-info-line">
-                        <span class="icon">🎯</span>
-                        <span>${lat}, ${lon}</span>
-                    </div>
-                    <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
-                        <span class="icon">⚡️</span>
-                        <span>${tracker.speed || 0} km/h</span>
-                    </div>
-                    <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
-                        <span class="icon">🔋</span>
-                        <span>${tracker.battery || 0}%</span>
-                    </div>
-                    <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
-                        <span class="tracker-time">${this.formatLocalDate(tracker.lastUpdate || tracker.timestamp)}</span>
-                    </div>
-                </div>`;
+    item.innerHTML = `
+        <div class="tracker-name">${tracker.devicename || tracker.id}</div>
+        <div class="tracker-info">
+            <div class="tracker-info-line">
+                <span class="icon">🎯</span>
+                <span>${lat}, ${lon}</span>
+            </div>
+            <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
+                <span class="icon">⚡️</span>
+                <span>${tracker.speed || 0} km/h</span>
+            </div>
+            <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
+                <span class="icon">🔋</span>
+                <span>${tracker.battery || 0}%</span>
+            </div>
+            <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
+                <span class="tracker-time">${this.formatLocalDate(tracker.lastUpdate || tracker.timestamp)}</span>
+            </div>
+        </div>`;
 
-            const historyBtn = document.createElement('button');
-            historyBtn.textContent = 'Voir historique 72H';
-            historyBtn.className = 'history-btn';
-            historyBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.showTrackerHistory(tracker.id);
-            };
-            item.appendChild(historyBtn);
-
-            item.onclick = () => {
-                if (this.markers[tracker.id]) {
-                    this.map.setView([tracker.latitude, tracker.longitude], 16);
-                    this.markers[tracker.id].openPopup();
-                }
-            };
-            list.appendChild(item);
-        });
-    }
-
-    async showTrackerHistory(trackerId) {
-        console.log(`[History] Requesting 72h history for tracker: ${trackerId}`);
-        // Remove previous history layer group if any
-        if (this.historyLayerGroup) {
-            this.map.removeLayer(this.historyLayerGroup);
-            this.historyLayerGroup = null;
+    const historyBtn = document.createElement('button');
+    historyBtn.textContent = 'Voir historique 72H';
+    historyBtn.className = 'history-btn';
+    historyBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.showTrackerHistory(tracker.id);
+    };
+    item.appendChild(historyBtn);
+    item.onclick = () => {
+        this.timelapseTrackerId = tracker.id;
+        document.getElementById('timelapse-slider').dispatchEvent(new Event('input'));
+        if (this.markers[tracker.id]) {
+            this.map.setView([tracker.latitude, tracker.longitude], 16);
+            this.markers[tracker.id].openPopup();
         }
+    };
+    list.appendChild(item);
+});
+}
+createPopupContent(tracker, isHistory = false) {
+    const lat = parseFloat(tracker.latitude).toFixed(6);
+    const lon = parseFloat(tracker.longitude).toFixed(6);
+    const speed = tracker.speed || 0;
+    const battery = tracker.battery || 0;
+    const lastUpdate = this.formatLocalDate(tracker.lastUpdate || tracker.timestamp);
+    // Use tracker_id for history items
+    const id = isHistory ? tracker.tracker_id : tracker.id;
+    const timestamp = new Date(tracker.timestamp).getTime();
+    const addressId = `address-${id}-${isHistory ? timestamp : 'current'}`;
+
+    return `<div class="popup-content">
+        <div class="popup-header">${tracker.devicename || id}</div>
+        <div class="popup-info">
+            <div><strong>Coords:</strong> ${lat}, ${lon}</div>
+            <div id="${addressId}" class="address-line">🕒 Chargement de l'adresse...</div>
+            <div><strong>Vitesse:</strong> ${speed} km/h</div>
+            <div><strong>Batterie:</strong> ${battery}%</div>
+            <div><strong>Dernière maj:</strong> ${lastUpdate}</div>
+            <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" class="gmaps-link">Ouvrir dans Google Maps</a>
+        </div>
+    </div>`;
+}
+async fetchAndDisplayAddress(lat, lon, elementId) {
+    try {
+        const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        if (response.ok) {
+            const data = await response.json();
+            element.textContent = `📍 ${data.address}`;
+        } else {
+            element.textContent = 'Adresse non disponible';
+        }
+    } catch (error) {
+        console.error('Failed to fetch address:', error);
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = "Erreur de chargement de l'adresse";
+        }
+    }
+}
+
+// --- END OF CLASS METHODS ---
+    /**
+     * Display the last 72-hour movement history for a tracker.
+     * Creates a polyline and markers on the map.
+     * @param {number|string} trackerId
+     */
+    async showTrackerHistory(trackerId) {
         try {
+            // Remove previous history layer if it exists
+            if (this.historyLayerGroup) {
+                this.map.removeLayer(this.historyLayerGroup);
+                this.historyLayerGroup = null;
+            }
+
             const resp = await fetch(`/api/trackers/${trackerId}/positions72h`);
             if (!resp.ok) {
                 const errorText = await resp.text();
@@ -306,12 +389,13 @@ class TrackerApp {
                 return;
             }
 
+            // Prepare layer group and path
             this.historyLayerGroup = L.featureGroup().addTo(this.map);
-
             const latlngs = positions.map(p => [p.latitude, p.longitude]);
             const polyline = L.polyline(latlngs, { color: '#0074D9', weight: 3, opacity: 0.7 });
             this.historyLayerGroup.addLayer(polyline);
 
+            // Add markers for each position
             positions.forEach(position => {
                 const circle = L.circleMarker([position.latitude, position.longitude], {
                     radius: 6,
@@ -320,25 +404,23 @@ class TrackerApp {
                     weight: 2,
                     opacity: 1,
                     fillOpacity: 0.8
-                });
-                
-                // The historical position object needs to be compatible with createPopupContent
-                const popupContent = this.createPopupContent(position, true);
-                circle.bindPopup(popupContent);
-                this.historyLayerGroup.addLayer(circle);
+                }).addTo(this.historyLayerGroup);
 
+                circle.bindPopup(this.createPopupContent(position, true));
                 circle.on('popupopen', () => {
                     const addressId = `address-${position.tracker_id}-${new Date(position.timestamp).getTime()}`;
                     this.fetchAndDisplayAddress(position.latitude, position.longitude, addressId);
                 });
             });
 
+            // Fit map view to history bounds
             this.map.fitBounds(this.historyLayerGroup.getBounds());
         } catch (err) {
             console.error('[History] Caught error while loading history:', err);
             alert(`Erreur lors du chargement de l'historique. Détails: ${err.message}`);
         }
     }
+
 }
 document.addEventListener('DOMContentLoaded', () => {
     new TrackerApp();

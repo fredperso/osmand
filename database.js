@@ -45,7 +45,8 @@ async function ensureSessionTable() {
         try {
             await pgPool.query(`ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid");`);
         } catch (err) {
-            if (!/already exists/.test(err.message)) throw err;
+            // Ignore error if primary key already exists (code 42P16)
+            if (!(err.code === '42P16' || /already exists/.test(err.message))) throw err;
         }
         try {
             await pgPool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");`);

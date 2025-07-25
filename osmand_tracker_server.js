@@ -120,6 +120,7 @@ const PORT = process.env.PORT || 3000;
 
 async function startServer() {
     await ensureTrackerPositionsTable();
+    await ensureSessionTable();
     server.listen(PORT, () => {
         console.log(`Serveur démarré sur http://localhost:${PORT}`);
     });

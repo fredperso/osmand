@@ -3,10 +3,19 @@
     padding: 0;
     box-sizing: border-box;
 }
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
 body {
     font-family: 'Arial', sans-serif;
     height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 #header {
     background: #2c3e50;
@@ -50,11 +59,106 @@ body {
     font-size: 0.9em;
 }
 #map {
-    height: calc(100vh - 60px);
-    width: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  width: 100%;
 }
+
+.tracker-inactive {
+    background: #f7f7f7 !important;
+}
+.tracker-inactive .tracker-info {
+    opacity: 0.55;
+    font-style: italic;
+}
+.history-btn {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    filter: none !important;
+}
+
+.footer-timelapse {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  background: #f8f9faee;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.07);
+  width: 100vw;
+  padding: 0 0 2px 0;
+  min-height: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.timelapse-controls {
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+#timelapse-slider {
+  width: 90%;
+  max-width: 500px;
+}
+#timelapse-time {
+  font-weight: bold;
+  margin-left: 7px;
+}
+#timelapse-info {
+  font-size: 0.95em;
+  color: #888;
+}
+#timelapse-now {
+  font-size: 0.98em;
+  color: #222;
+  margin: 0 0 0 14px;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .timelapse-controls {
+    flex-direction: column;
+    gap: 2px;
+    max-width: 98vw;
+  }
+  #timelapse-slider {
+    width: 98vw;
+    max-width: 98vw;
+  }
+  #timelapse-now {
+    margin: 0;
+    font-size: 1em;
+  }
+}
+
+  #map {
+    min-height: 200px;
+    height: 40vh;
+  }
+  .timelapse-controls {
+    max-width: 98vw;
+  }
+  #timelapse-slider {
+    width: 98vw;
+    max-width: 98vw;
+  }
+}
+
+/* Prevent map and sidebar from being hidden by footer */
+#map, #sidebar {
+  margin-bottom: 38px;
+}
+
+
 #sidebar {
-    position: absolute;
+    position: fixed;
     top: 60px;
     right: 0;
     width: 300px;
@@ -63,9 +167,10 @@ body {
     backdrop-filter: blur(10px);
     border-left: 1px solid #ddd;
     overflow-y: auto;
-    z-index: 1000;
+    z-index: 3000;
     transform: translateX(100%);
     transition: transform 0.3s ease;
+    padding-bottom: 70px;
 }
 #sidebar.open {
     transform: translateX(0);
@@ -105,6 +210,10 @@ body {
     background: #f8f9fa;
 }
 .history-btn {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    filter: none !important;
+
     margin-top: 8px;
     padding: 5px 12px;
     background: #3498db;

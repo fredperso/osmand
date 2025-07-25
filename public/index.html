@@ -17,10 +17,19 @@
         </div>
     </div>
     <div id="map"></div>
+    <footer class="footer-timelapse">
+      <div id="timelapse-controls" class="timelapse-controls">
+        <label for="timelapse-slider"><b>Timelapse&nbsp;:</b></label>
+        <input type="range" id="timelapse-slider" min="0" max="4320" value="0" step="1" style="width: 70%;">
+        <span id="timelapse-time">Now</span>
+        <div id="timelapse-info" style="margin-top: 8px; color: #888;"></div>
+        <div id="timelapse-now" style="margin-top: 10px; font-size: 1.1em; color: #222;"></div>
+      </div>
+    </footer>
     <button id="sidebar-toggle">📋 Liste</button>
     <div id="sidebar">
         <div style="padding: 15px; background: #f8f9fa; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-            <strong>Trackers Actifs</strong>
+            <strong>Trackers</strong>
             <button id="sidebar-close-btn">&times;</button>
         </div>
         <div id="tracker-list"></div>

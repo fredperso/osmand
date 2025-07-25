@@ -6,10 +6,23 @@ class TrackerApp {
         this.sidebarOpen = false;
         this.init();
     }
-    init() {
+    async init() {
         this.initMap();
         this.initSocket();
         this.initUI();
+        // Fetch all recent trackers (active + inactive) on load
+        try {
+            const resp = await fetch('/api/trackers');
+            if (resp.ok) {
+                const trackers = await resp.json();
+                trackers.forEach(tracker => {
+                    this.trackers[tracker.id] = tracker;
+                });
+                this.updateTrackerList();
+            }
+        } catch (err) {
+            console.error('Erreur lors du chargement des trackers:', err);
+        }
     }
     initMap() {
         const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -49,6 +62,7 @@ class TrackerApp {
             this.updateConnectionStatus(false);
         });
         this.socket.on('trackerUpdate', (tracker) => {
+
             this.updateTracker(tracker);
         });
         this.socket.on('trackerRemove', (trackerId) => {
@@ -56,6 +70,79 @@ class TrackerApp {
         });
     }
     initUI() {
+        // Timelapse slider logic
+        const nowDiv = document.getElementById('timelapse-now');
+        function updateNowDiv() {
+            const now = new Date();
+            const pad = n => n.toString().padStart(2, '0');
+            const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            nowDiv.textContent = `Date/Heure actuelle : ${dateStr} ${timeStr}`;
+        }
+        updateNowDiv();
+        setInterval(updateNowDiv, 1000);
+        const slider = document.getElementById('timelapse-slider');
+        const timeLabel = document.getElementById('timelapse-time');
+        const infoDiv = document.getElementById('timelapse-info');
+        this.timelapseMarker = null;
+        this.timelapseActive = false;
+        this.timelapseTrackerId = null;
+        this.timelapseLastFetch = null;
+
+        // Helper to get ISO timestamp for slider value (minutes ago)
+        function sliderValueToTimestamp(val) {
+            const now = Date.now();
+            const msAgo = parseInt(val, 10) * 60 * 1000;
+            return new Date(now - msAgo).toISOString();
+        }
+
+        // Helper to format slider label
+        function sliderValueToLabel(val) {
+            if (parseInt(val, 10) === 0) return 'Now';
+            const dt = new Date(Date.now() - parseInt(val, 10) * 60 * 1000);
+            return dt.toLocaleString();
+        }
+
+        // Pick a tracker for timelapse (default: first in list)
+        this.getTimelapseTrackerId = () => {
+            const trackerArray = Object.values(this.trackers);
+            if (trackerArray.length === 0) return null;
+            // If user previously selected, keep it
+            if (this.timelapseTrackerId && this.trackers[this.timelapseTrackerId]) return this.timelapseTrackerId;
+            return trackerArray[0].id;
+        };
+
+        // Main timelapse slider handler
+        slider.addEventListener('input', async (e) => {
+            const val = slider.value;
+            timeLabel.textContent = sliderValueToLabel(val);
+            infoDiv.textContent = '';
+            const trackerId = this.getTimelapseTrackerId();
+            if (!trackerId) {
+                infoDiv.textContent = 'Aucun tracker actif.';
+                return;
+            }
+            this.timelapseActive = true;
+            await this.showTimelapse(trackerId, sliderValueToTimestamp(val));
+            // Ensure sidebar stays visible during timelapse
+            document.getElementById('sidebar').classList.add('open');
+            this.sidebarOpen = true;
+        });
+        // Reset timelapse if user interacts with live map
+        document.getElementById('map').addEventListener('click', () => {
+            if (this.timelapseMarker) {
+                this.map.removeLayer(this.timelapseMarker);
+                this.timelapseMarker = null;
+            }
+            this.timelapseActive = false;
+        });
+        // When a new tracker is added, update slider tracker
+        this.updateTimelapseTracker = () => {
+            if (!this.timelapseActive) {
+                this.timelapseTrackerId = this.getTimelapseTrackerId();
+            }
+        };
+    
         const toggleSidebar = () => {
             this.sidebarOpen = !this.sidebarOpen;
             document.getElementById('sidebar').classList.toggle('open', this.sidebarOpen);
@@ -75,6 +162,8 @@ class TrackerApp {
         }
     }
     updateTracker(tracker) {
+
+        this.updateTimelapseTracker && this.updateTimelapseTracker();
         this.trackers[tracker.id] = tracker;
         this.updateTrackerList();
         // Add or update marker
@@ -155,7 +244,7 @@ class TrackerApp {
         document.getElementById('tracker-count').textContent = `${trackerArray.length} tracker${trackerArray.length !== 1 ? 's' : ''}`;
         trackerArray.forEach(tracker => {
             const item = document.createElement('div');
-            item.className = 'tracker-item';
+            item.className = 'tracker-item' + (tracker.inactive ? ' tracker-inactive' : '');
             const lat = parseFloat(tracker.latitude).toFixed(4);
             const lon = parseFloat(tracker.longitude).toFixed(4);
 
@@ -166,15 +255,15 @@ class TrackerApp {
                         <span class="icon">🎯</span>
                         <span>${lat}, ${lon}</span>
                     </div>
-                    <div class="tracker-info-line">
+                    <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
                         <span class="icon">⚡️</span>
                         <span>${tracker.speed || 0} km/h</span>
                     </div>
-                    <div class="tracker-info-line">
+                    <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
                         <span class="icon">🔋</span>
                         <span>${tracker.battery || 0}%</span>
                     </div>
-                    <div class="tracker-info-line">
+                    <div class="tracker-info-line"${tracker.inactive ? ' style="opacity:0.4; pointer-events:none; user-select:none;"' : ''}>
                         <span class="tracker-time">${this.formatLocalDate(tracker.lastUpdate || tracker.timestamp)}</span>
                     </div>
                 </div>`;

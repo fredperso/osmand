@@ -42,6 +42,7 @@ function createPublicRoutes(io, trackers) {
                 console.error('PG insert error:', dbErr);
             });
 
+
             io.emit('trackerUpdate', trackerData);
             res.status(200).send('OK');
         } catch (error) {

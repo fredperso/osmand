@@ -4,6 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 
 // Import local modules
@@ -23,10 +24,14 @@ app.set('trust proxy', 1);
 
 // Session middleware setup
 app.use(session({
+    store: new pgSession({
+        pool: pgPool, // use existing pg Pool
+        tableName: 'session' // default table name
+    }),
     secret: process.env.SESSION_SECRET || 'osmand-tracker-secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' } // Use secure cookies in production
+    cookie: { secure: process.env.NODE_ENV === 'production' }
 }));
 
 // Body parsers

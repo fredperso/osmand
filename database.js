@@ -36,17 +36,22 @@ async function ensureTrackerPositionsTable() {
 }
 
 async function ensureSessionTable() {
-    const createSessionTableSQL = `
-    CREATE TABLE IF NOT EXISTS "session" (
-      "sid" varchar NOT NULL COLLATE "default",
-      "sess" json NOT NULL,
-      "expire" timestamp(6) NOT NULL
-    ) WITH (OIDS=FALSE);
-    ALTER TABLE "session" ADD CONSTRAINT IF NOT EXISTS "session_pkey" PRIMARY KEY ("sid");
-    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
-    `;
     try {
-        await pgPool.query(createSessionTableSQL);
+        await pgPool.query(`CREATE TABLE IF NOT EXISTS "session" (
+            "sid" varchar NOT NULL COLLATE "default",
+            "sess" json NOT NULL,
+            "expire" timestamp(6) NOT NULL
+        ) WITH (OIDS=FALSE);`);
+        try {
+            await pgPool.query(`ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid");`);
+        } catch (err) {
+            if (!/already exists/.test(err.message)) throw err;
+        }
+        try {
+            await pgPool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");`);
+        } catch (err) {
+            if (!/already exists/.test(err.message)) throw err;
+        }
         console.log("session table ensured.");
     } catch (err) {
         console.error("Error ensuring session table:", err);
